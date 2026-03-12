@@ -1,5 +1,6 @@
 from researcher import researcher_agent
 from analyst import analyst_agent
+from writer import writer_agent
 
 # Initial state
 state = {
@@ -29,8 +30,13 @@ state = researcher_agent(state)
 # Agent 2
 state = analyst_agent(state)
 
+# Agent 3
+state = writer_agent(state)
+
 print("\n--- FINAL RESULTS ---")
 print(f"Company: {state['company_name']}")
 print(f"Fit Score: {state['fit_score']}/100")
 print(f"Pain Points: {state['pain_points']}")
 print(f"Value Props: {state['value_props']}")
+print(f"\nEmail Subject: {state['email_subject']}")
+print(f"\nEmail Body:\n{state['email_body']}")
