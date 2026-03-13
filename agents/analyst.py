@@ -1,11 +1,20 @@
 from state import PitchState
+from dotenv import load_dotenv
+import os
+from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_core.messages import HumanMessage
+
+load_dotenv("../.env")
+
+llm = ChatGoogleGenerativeAI(
+    model="gemini-2.0-flash",
+    google_api_key=os.getenv("GEMINI_API_KEY")
+)
 
 def analyst_agent(state: PitchState) -> PitchState:
     """
     Agent 2: Analyst
-    Job: Read the research and decide:
-    - How good is this lead? (score 0-100)
-    - What value can we offer them?
+    Job: Use Gemini to score the lead and map value props
     """
     
     company_name = state["company_name"]
@@ -15,47 +24,59 @@ def analyst_agent(state: PitchState) -> PitchState:
     
     print(f"📊 Analysing {company_name}...")
     
-    # Score the lead
-    fit_score = calculate_fit_score(pain_points, signals)
+    analysis = analyze_with_gemini(company_name, company_summary, pain_points, signals)
     
-    # Map pain points to value propositions
-    value_props = map_value_props(pain_points)
-    
-    print(f"✅ Analysis complete — Fit Score: {fit_score}/100")
+    print(f"✅ Analysis complete — Fit Score: {analysis['fit_score']}/100")
     
     return {
         **state,
-        "fit_score": fit_score,
-        "value_props": value_props
+        "fit_score": analysis["fit_score"],
+        "value_props": analysis["value_props"]
     }
 
 
-def calculate_fit_score(pain_points: list, signals: list) -> int:
-    """Score the lead from 0-100"""
-    score = 50  # base score
+def analyze_with_gemini(company_name, summary, pain_points, signals) -> dict:
     
-    # More pain points = better fit
-    score += len(pain_points) * 10
+    pain_str = "\n".join(pain_points)
+    signal_str = "\n".join(signals)
     
-    # More signals = hotter lead
-    score += len(signals) * 5
+    prompt = f"""You are a B2B sales analyst for J.A. Uniforms, a premium uniform supplier for hotels.
+
+Analyze this lead and provide scoring:
+
+Company: {company_name}
+Summary: {summary}
+Pain Points: {pain_str}
+Buying Signals: {signal_str}
+
+J.A. Uniforms offers: custom uniforms, bulk ordering, 48-hour delivery, inventory management portal, size profiles per employee.
+
+Return in this exact format:
+FIT_SCORE: [number 0-100]
+VALUE_PROPS: [specific value prop 1] | [specific value prop 2] | [specific value prop 3]
+
+Score high (80-100) if: large hospitality company, multiple locations, staff uniformity matters
+Score medium (50-79) if: smaller hotel, some uniform needs
+Score low (0-49) if: not hospitality related
+"""
     
-    # Cap at 100
-    return min(score, 100)
+    response = llm.invoke([HumanMessage(content=prompt)])
+    return parse_response(response.content)
 
 
-def map_value_props(pain_points: list) -> list[str]:
-    """Map pain points to what we can offer"""
-    # Placeholder - Gemini will do this intelligently later
-    value_map = {
-        "Supply chain management": "Our uniforms ship in 48 hours with real-time tracking",
-        "Uniform inventory tracking": "Our portal gives live inventory visibility across all locations",
-        "Staff onboarding at scale": "Bulk ordering with size profiles saved per employee"
-    }
+def parse_response(response: str) -> dict:
+    lines = response.strip().split("\n")
     
-    props = []
-    for pain in pain_points:
-        if pain in value_map:
-            props.append(value_map[pain])
+    result = {"fit_score": 50, "value_props": []}
     
-    return props if props else ["Custom uniform solutions tailored to your needs"]
+    for line in lines:
+        if line.startswith("FIT_SCORE:"):
+            try:
+                result["fit_score"] = int(line.replace("FIT_SCORE:", "").strip())
+            except:
+                result["fit_score"] = 50
+        elif line.startswith("VALUE_PROPS:"):
+            props = line.replace("VALUE_PROPS:", "").strip()
+            result["value_props"] = [p.strip() for p in props.split("|")]
+    
+    return result

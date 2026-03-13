@@ -18,7 +18,7 @@ def critic_agent(state: PitchState) -> PitchState:
     print(f"🔍 Critiquing email for {company_name}...")
     
     # Run quality checks
-    checks = run_quality_checks(email_subject, email_body)
+    checks = run_quality_checks(email_subject, email_body, company_name)
     
     # Calculate overall quality
     passed = all(checks.values())
@@ -36,8 +36,7 @@ def critic_agent(state: PitchState) -> PitchState:
         "quality_feedback": feedback
     }
 
-
-def run_quality_checks(subject: str, body: str) -> dict:
+def run_quality_checks(subject: str, body: str, company_name: str = "") -> dict:
     """Run all quality checks on the email"""
     checks = {}
     
@@ -54,7 +53,7 @@ def run_quality_checks(subject: str, body: str) -> dict:
     checks["not_salesy"] = not any(word in body.lower() for word in salesy_words)
     
     # Check 4: Has personalization
-    checks["is_personalized"] = len(subject) > 10 and "Quick idea" in subject
+    checks["is_personalized"] = len(subject) > 10
     
     # Check 5: Has a sign off
     checks["has_signoff"] = "Best" in body or "Thanks" in body or "Regards" in body

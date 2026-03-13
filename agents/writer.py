@@ -1,74 +1,97 @@
 from state import PitchState
+from dotenv import load_dotenv
+import os
+from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_core.messages import HumanMessage
+
+load_dotenv("../.env")
+
+llm = ChatGoogleGenerativeAI(
+    model="gemini-2.0-flash",
+    google_api_key=os.getenv("GEMINI_API_KEY")
+)
 
 def writer_agent(state: PitchState) -> PitchState:
     """
     Agent 3: Writer
-    Job: Generate a hyper-personalized email using
-    everything the Researcher and Analyst found
+    Job: Use Gemini to write a hyper-personalized email
+    that sounds human, not like a template
     """
     
     company_name = state["company_name"]
     pain_points = state.get("pain_points", [])
     value_props = state.get("value_props", [])
     fit_score = state.get("fit_score", 0)
+    company_summary = state.get("company_summary", "")
     
     print(f"✍️  Writing email for {company_name}...")
     
-    # Only write if fit score is good enough
     if fit_score < 30:
         print(f"⚠️  Fit score too low ({fit_score}/100) — skipping")
-        return {
-            **state,
-            "email_subject": None,
-            "email_body": None
-        }
+        return {**state, "email_subject": None, "email_body": None}
     
-    # Generate email
-    subject = generate_subject(company_name, pain_points)
-    body = generate_body(company_name, pain_points, value_props)
+    email = generate_email_with_gemini(
+        company_name, company_summary, pain_points, value_props
+    )
     
     print(f"✅ Email written successfully")
     
     return {
         **state,
-        "email_subject": subject,
-        "email_body": body
+        "email_subject": email["subject"],
+        "email_body": email["body"]
     }
 
 
-def generate_subject(company_name: str, pain_points: list) -> str:
-    """Generate a personalized subject line"""
-    if pain_points:
-        first_pain = pain_points[0].lower()
-        return f"Quick idea for {company_name}'s {first_pain}"
-    return f"Quick idea for {company_name}"
-
-
-def generate_body(company_name: str, pain_points: list, value_props: list) -> str:
-    """Generate personalized email body"""
+def generate_email_with_gemini(company_name, summary, pain_points, value_props) -> dict:
     
-    # Build pain point line
-    pain_line = ""
-    if pain_points:
-        pain_line = f"I noticed {company_name} is likely dealing with {pain_points[0].lower()} — especially at your scale."
+    pain_str = "\n".join(pain_points)
+    value_str = "\n".join(value_props)
     
-    # Build value prop line
-    value_line = ""
-    if value_props:
-        value_line = value_props[0]
+    prompt = f"""You are Jay, a sales rep at J.A. Uniforms writing a cold outreach email.
+
+Write a short, human, personalized cold email. NOT a template. NOT salesy. 
+Sound like a real person who did their research.
+
+Company: {company_name}
+About them: {summary}
+Their pain points: {pain_str}
+What we offer them: {value_str}
+
+Rules:
+- Maximum 100 words in the body
+- No buzzwords (no "synergy", "leverage", "revolutionary")
+- One specific pain point reference
+- One clear call to action (15 minute call)
+- Sound human and conversational
+- Sign off as Jay from J.A. Uniforms
+
+Return in this exact format:
+SUBJECT: [subject line]
+BODY:
+[email body here]
+"""
     
-    email = f"""Hi [Name],
+    response = llm.invoke([HumanMessage(content=prompt)])
+    return parse_email(response.content)
 
-{pain_line}
 
-We work with hotels and hospitality groups to solve exactly that. {value_line}
-
-We recently helped a similar company cut their uniform procurement time by 60%.
-
-Worth a 15-minute call to see if we can do the same for {company_name}?
-
-Best,
-Jay
-J.A. Uniforms"""
-
-    return email
+def parse_email(response: str) -> dict:
+    lines = response.strip().split("\n")
+    
+    subject = ""
+    body_lines = []
+    in_body = False
+    
+    for line in lines:
+        if line.startswith("SUBJECT:"):
+            subject = line.replace("SUBJECT:", "").strip()
+        elif line.startswith("BODY:"):
+            in_body = True
+        elif in_body:
+            body_lines.append(line)
+    
+    return {
+        "subject": subject,
+        "body": "\n".join(body_lines).strip()
+    }

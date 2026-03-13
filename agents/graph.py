@@ -79,3 +79,6 @@ if __name__ == "__main__":
     print(f"Quality Approved: {result['quality_approved']}")
     print(f"Send Time: {result['send_time']}")
     print(f"Follow Ups: {result['follow_up_sequence']}")
+    print(f"\nEmail Subject: {result['email_subject']}")
+    print(f"\nEmail Body:\n{result['email_body']}")
+    print(f"\nValue Props: {result['value_props']}")
