@@ -1,3 +1,9 @@
 {
-    "python-envs.defaultEnvManager": "ms-python.python:system"
+    "python-envs.defaultEnvManager": "ms-python.python:system",
+    "css.validate": false,
+    "less.validate": false,
+    "scss.validate": false,
+    "python.terminal.useEnvFile": true,
+    "explorer.confirmPasteNative": false,
+    "explorer.confirmDragAndDrop": false
 }
