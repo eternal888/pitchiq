@@ -12,6 +12,7 @@ sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 
 from database.database import SessionLocal
 from database.crud import save_research, get_all_research, get_pending_research, approve_research, reject_research
+from api.email_sender import send_email
 
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'agents'))
 
@@ -247,7 +248,27 @@ def approve_email(research_id: int):
     db.close()
     if not record:
         raise HTTPException(status_code=404, detail="Research not found")
-    return {"message": f"Email approved!", "id": research_id}
+    
+    # Send the email!
+    if record.email and record.email_subject and record.email_body:
+        #from email_sender import send_email
+        result = send_email(
+            to_email=record.email,
+            subject=record.email_subject,
+            body=record.email_body
+        )
+        if result["success"]:
+            return {
+                "message": f"Email approved and sent to {record.email}!",
+                "id": research_id,
+                "email_sent": True
+            }
+    
+    return {
+        "message": f"Email approved for {record.contact_name}!",
+        "id": research_id,
+        "email_sent": False
+    }
 
 
 @app.post("/reject/{research_id}")
